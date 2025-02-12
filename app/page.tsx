@@ -1,76 +1,107 @@
 'use client'
 
-import { useEffect, useState } from 'react';
-import  WalletConnector  from './components/WalletConnector';
-import { generatePaymentLink } from '../utils/tonPayment';
+import { useEffect, useState, useCallback } from 'react';
+import WalletConnector from './components/WalletConnector';
+import { 
+  generatePaymentLink, 
+  handlePaymentCallback, 
+  isTelegramWebApp,
+  formatTonAmount 
+} from '../utils/tonPayment';
 
 declare global {
   interface Window {
-    Telegram?: {
-      WebApp: {
-        initDataUnsafe: any;
-        ready: () => void;
-        expand: () => void;
-        openInvoice: (
-          url: string,
-          callback: (status: 'paid' | 'cancelled' | 'failed' | string) => void
-        ) => void;
-      };
+    Telegram: {
+      WebApp: any;
     };
   }
 }
 
-
-const YOUR_WALLET_ADDRESS = 'UQA3x6PraY-6pdTf1dXG30aZvQJNU-0U2jgYc2cUJzageM01';
+const WALLET_ADDRESS = 'UQA3x6PraY-6pdTf1dXG30aZvQJNU-0U2jgYc2cUJzageM01';
 
 const PaymentPage = () => {
-  const [paymentStatus, setPaymentStatus] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [amount, setAmount] = useState(10);
-  const [error, setError] = useState('');
+  const [paymentState, setPaymentState] = useState({
+    status: '',
+    isProcessing: false,
+    amount: 10,
+    error: ''
+  });
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+    if (isTelegramWebApp()) {
       try {
         window.Telegram.WebApp.ready();
         window.Telegram.WebApp.expand();
       } catch (err) {
-        console.error('Failed to initialize Telegram WebApp:', err);
-        setError('Failed to initialize Telegram interface');
+        setPaymentState(prev => ({
+          ...prev,
+          error: 'Failed to initialize Telegram interface'
+        }));
       }
     }
   }, []);
 
-  const handlePayment = async () => {
-    if (!window.Telegram?.WebApp) {
-      setError('This app must be run within Telegram');
+  const handlePayment = useCallback(async () => {
+    if (!isTelegramWebApp()) {
+      setPaymentState(prev => ({
+        ...prev,
+        error: 'This app must be run within Telegram'
+      }));
       return;
     }
 
     try {
-      setIsProcessing(true);
-      setError('');
-      setPaymentStatus('');
+      setPaymentState(prev => ({
+        ...prev,
+        isProcessing: true,
+        error: '',
+        status: ''
+      }));
 
-      const paymentLink = generatePaymentLink(amount, YOUR_WALLET_ADDRESS);
+      const paymentLink = generatePaymentLink(paymentState.amount, WALLET_ADDRESS);
       
-      window.Telegram.WebApp.openInvoice(paymentLink, (status: string) => {
-        if (status === 'paid') {
-          setPaymentStatus('Payment successful!');
-        } else if (status === 'cancelled') {
-          setPaymentStatus('Payment was cancelled');
-        } else if (status === 'failed') {
-          setPaymentStatus('Payment failed');
-          setError('There was an issue processing your payment');
+      if (!paymentLink) {
+        throw new Error('Failed to generate payment link');
+      }
+
+      window.Telegram.WebApp.openInvoice(
+        paymentLink,
+        (status : string) => {
+          handlePaymentCallback(status, {
+            onSuccess: () => {
+              setPaymentState(prev => ({
+                ...prev,
+                status: 'Payment successful!',
+                isProcessing: false
+              }));
+            },
+            onFailure: (error) => {
+              setPaymentState(prev => ({
+                ...prev,
+                status: 'Payment failed',
+                error,
+                isProcessing: false
+              }));
+            },
+            onCancel: () => {
+              setPaymentState(prev => ({
+                ...prev,
+                status: 'Payment was cancelled',
+                isProcessing: false
+              }));
+            }
+          });
         }
-        setIsProcessing(false);
-      });
+      );
     } catch (err) {
       console.error('Payment error:', err);
-      setError('Failed to initiate payment');
-      setIsProcessing(false);
+      setPaymentState(prev => ({
+        ...prev,
+        error: err instanceof Error ? err.message : 'Failed to initiate payment',
+        isProcessing: false
+      }));
     }
-  };
+  }, [paymentState.amount]);
 
   return (
     <div className="min-h-screen bg-black p-4">
@@ -88,43 +119,46 @@ const PaymentPage = () => {
             </label>
             <input
               type="number"
-              min="0.1"
-              step="0.1"
-              value={amount}
-              onChange={(e) => setAmount(Number(e.target.value))}
+              min="0.01"
+              step="0.01"
+              value={paymentState.amount}
+              onChange={(e) => setPaymentState(prev => ({
+                ...prev,
+                amount: Number(e.target.value)
+              }))}
               className="w-full px-3 py-2 border rounded-md"
-              disabled={isProcessing}
+              disabled={paymentState.isProcessing}
             />
           </div>
 
-          {error && (
+          {paymentState.error && (
             <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded">
-              {error}
+              {paymentState.error}
             </div>
           )}
 
-          {paymentStatus && (
+          {paymentState.status && (
             <div className={`p-3 rounded ${
-              paymentStatus.includes('successful')
+              paymentState.status.includes('successful')
                 ? 'bg-green-50 border border-green-200 text-green-700'
                 : 'bg-yellow-50 border border-yellow-200 text-yellow-700'
             }`}>
-              {paymentStatus}
+              {paymentState.status}
             </div>
           )}
 
           <button
             onClick={handlePayment}
-            disabled={isProcessing || amount <= 0}
+            disabled={paymentState.isProcessing || paymentState.amount <= 0}
             className="w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
           >
-            {isProcessing ? (
+            {paymentState.isProcessing ? (
               <div className="flex items-center space-x-2">
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 <span>Processing...</span>
               </div>
             ) : (
-              <span>Pay {amount} TON</span>
+              <span>Pay {formatTonAmount(paymentState.amount)}</span>
             )}
           </button>
         </div>

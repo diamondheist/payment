@@ -9,8 +9,6 @@ export default function WalletConnector() {
   const [tonWalletAddress, setTonWalletAddress] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const balance = 100
-
   const handleWalletConnection = useCallback((address: string) => {
     setTonWalletAddress(address);
     console.log("Wallet connected successfully!");
