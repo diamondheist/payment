@@ -9,7 +9,9 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ton/core": "^0.60.0",
     "@tonconnect/sdk": "^3.0.6",
+    "@tonconnect/ui-react": "^2.0.11",
     "next": "14.2.23",
     "react": "^18",
     "react-dom": "^18",

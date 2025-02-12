@@ -1,144 +1,96 @@
-"use client"; // Mark as a client component
+'use client'
 
-import { useState, useEffect } from 'react';
-import { TonConnect, Wallet, WalletConnectionSource } from '@tonconnect/sdk';
+import { useState, useEffect, useCallback } from 'react';
+import { useTonConnectUI } from '@tonconnect/ui-react';
+import { Address } from "@ton/core";
 
-// Conditionally initialize the connector only on the client
-let connector: TonConnect | null = null;
-if (typeof window !== 'undefined') {
-  connector = new TonConnect({
-    manifestUrl: 'https://your-app.com/tonconnect-manifest.json',
-    network: 'mainnet'
-  } as any);
-}
-
-// Define universal wallet source
-const UNIVERSAL_WALLET_SOURCE: WalletConnectionSource = {
-  jsBridgeKey: 'tonkeeper',
-  bridgeUrl: 'https://bridge.tonapi.io/bridge',
-  universalLink: 'https://app.tonkeeper.com/ton-connect'
-};
-
-export const WalletConnector = () => {
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+export default function WalletConnector() {
+  const [tonConnectUI] = useTonConnectUI();
+  const [tonWalletAddress, setTonWalletAddress] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  const balance = 100
+
+  const handleWalletConnection = useCallback((address: string) => {
+    setTonWalletAddress(address);
+    console.log("Wallet connected successfully!");
+    setIsLoading(false);
+  }, []);
+
+  const handleWalletDisconnection = useCallback(() => {
+    setTonWalletAddress(null);
+    console.log("Wallet disconnected successfully!");
+    setIsLoading(false);
+  }, []);
 
   useEffect(() => {
-    // If the connector is not initialized (e.g. during SSR), simply stop loading.
-    if (!connector) {
-      setIsLoading(false);
-      return;
-    }
-
-    const checkConnection = async () => {
-      try {
-        const wallet = connector.wallet;
-        if (wallet) {
-          setWalletAddress(wallet.account.address);
-        }
-      } catch (err) {
-        console.error('Failed to restore connection:', err);
-        setError('Failed to check wallet connection');
-      } finally {
-        setIsLoading(false);
+    const checkWalletConnection = async () => {
+      if (tonConnectUI.account?.address) {
+        handleWalletConnection(tonConnectUI.account?.address);
+      } else {
+        handleWalletDisconnection();
       }
     };
 
-    checkConnection();
+    checkWalletConnection();
 
-    // Subscribe to connection status changes
-    const unsubscribe = connector.onStatusChange((wallet: Wallet | null) => {
+    const unsubscribe = tonConnectUI.onStatusChange((wallet) => {
       if (wallet) {
-        setWalletAddress(wallet.account.address);
-        setError(null);
+        handleWalletConnection(wallet.account.address);
       } else {
-        setWalletAddress(null);
+        handleWalletDisconnection();
       }
     });
 
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [tonConnectUI, handleWalletConnection, handleWalletDisconnection]);
 
-  const handleConnect = async () => {
-    if (!connector) {
-      console.error('TonConnect not initialized');
-      return;
-    }
-
-    try {
-      setError(null);
+  const handleWalletAction = async () => {
+    if (tonConnectUI.connected) {
       setIsLoading(true);
-
-      // Connect using the universal wallet source
-      await connector.connect(UNIVERSAL_WALLET_SOURCE);
-
-      // Get the wallet address after connecting
-      const wallet = connector.wallet;
-      if (wallet) {
-        setWalletAddress(wallet.account.address);
-      }
-    } catch (err) {
-      console.error('Connection error:', err);
-      setError('Failed to connect wallet');
-    } finally {
-      setIsLoading(false);
+      await tonConnectUI.disconnect();
+    } else {
+      await tonConnectUI.openModal();
     }
   };
 
-  const handleDisconnect = async () => {
-    if (!connector) {
-      console.error('TonConnect not initialized');
-      return;
-    }
-
-    try {
-      await connector.disconnect();
-      setWalletAddress(null);
-      setError(null);
-    } catch (err) {
-      console.error('Disconnection error:', err);
-      setError('Failed to disconnect wallet');
-    }
+  const formatAddress = (address: string) => {
+    const tempAddress = Address.parse(address).toString();
+    return `${tempAddress.slice(0, 4)}...${tempAddress.slice(-4)}`;
   };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center">
-        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-      </div>
+      <main className="flex min-h-screen flex-col items-center justify-center">
+        <div className="bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded">
+          Loading...
+        </div>
+      </main>
     );
   }
 
   return (
-    <div className="space-y-2">
-      {error && (
-        <p className="text-red-500 text-sm">{error}</p>
-      )}
+    <div className="flex flex-col justify-center items-center p-2 rounded-lg shadow-lg max-w-4xl mx-auto">
+      <h1 className="text-3xl font-semibold text-gray-400 mb-6">Wallet</h1>
       
-      {walletAddress ? (
-        <div className="flex items-center gap-2">
-          <p className="text-sm">
-            Connected: {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-          </p>
-          <button
-            onClick={handleDisconnect}
-            className="text-red-500 text-sm hover:text-red-600"
-          >
-            Disconnect
-          </button>
-        </div>
-      ) : (
-        <button
-          onClick={handleConnect}
-          disabled={isLoading}
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Connect TON Wallet
-        </button>
-      )}
+      <div className='text-center'>
+        {tonWalletAddress ? (
+            <div className="flex flex-col items-center">
+            <p className="mb-4">Wallet Address : {formatAddress(tonWalletAddress)}</p>
+            <button 
+            onClick={handleWalletAction} 
+            className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-semibold py-3 px-6 rounded-full shadow-lg transition duration-300 ease-in-out">Disconnect Wallet</button>
+            </div>
+        ) : (
+            <button 
+            onClick={handleWalletAction}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-full shadow-md hover:bg-blue-600 transition"> Connect TON Wallet</button>
+        )
+
+        }
+      </div>
     </div>
   );
-};
+}

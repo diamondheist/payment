@@ -1,13 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react';
-import { WalletConnector } from './components/WalletConnector';
+import  WalletConnector  from './components/WalletConnector';
 import { generatePaymentLink } from '../utils/tonPayment';
 
 declare global {
   interface Window {
     Telegram?: {
       WebApp: {
+        initDataUnsafe: any;
         ready: () => void;
         expand: () => void;
         openInvoice: (
