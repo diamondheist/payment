@@ -17,27 +17,30 @@ interface TransactionResponse {
 
 // Generate payment link with validation
 export const generatePaymentLink = (
-  amount: number,
-  recipient: string
-): string | null => {
-  try {
-    // Validate amount
-    if (amount < MIN_AMOUNT || amount > MAX_AMOUNT) {
-      throw new Error(`Amount must be between ${MIN_AMOUNT} and ${MAX_AMOUNT} TON`);
+    amount: number,
+    recipient: string
+  ): string | null => {
+    try {
+      // Validate amount
+      if (amount < MIN_AMOUNT || amount > MAX_AMOUNT) {
+        throw new Error(`Amount must be between ${MIN_AMOUNT} and ${MAX_AMOUNT} TON`);
+      }
+  
+      // Validate recipient address
+      if (!recipient.match(/^[0-9A-Za-z_-]{48}$/)) {
+        throw new Error('Invalid TON wallet address');
+      }
+  
+      const amountInNano = toNano(amount).toString();
+      
+      // Replace YOUR_BOT_USERNAME with your actual bot username (without @)
+      return `https://t.me/Diamondheistbot/pay?amount=${amountInNano}&address=${recipient}`;
+      
+    } catch (error) {
+      console.error('Error generating payment link:', error);
+      return null;
     }
-
-    // Validate recipient address
-    if (!recipient.match(/^[0-9A-Za-z_-]{48}$/)) {
-      throw new Error('Invalid TON wallet address');
-    }
-
-    // Generate payment URL with toNano conversion
-    return `ton://transfer/${recipient}?amount=${toNano(amount)}`;
-  } catch (error) {
-    console.error('Error generating payment link:', error);
-    return null;
-  }
-};
+  };
 
 // Validate transaction with more robust error handling
 export const validateTransaction = async (
