@@ -1,49 +1,19 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { TonConnectButton, useTonConnectUI, useTonAddress, useTonWallet } from '@tonconnect/ui-react';
 import { db } from "@/lib/firebase";
-import { doc, updateDoc, increment, getDoc } from "firebase/firestore";
-import { UserData } from '../types/telegram';
+import { doc, updateDoc, increment } from "firebase/firestore";
 
 const Page = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [userData, setUserData] = useState<UserData | null>(null);
   
   const [tonConnectUI] = useTonConnectUI();
   const address = useTonAddress();
   const wallet = useTonWallet();
 
-  
-  // Load user data when component mounts
-  useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        // Get telegramId from wherever you store it (localStorage, URL param, etc)
-        const telegramId = localStorage.getItem('telegramId'); // Adjust this based on how you store the ID
-        if (!telegramId) {
-          setError('Please connect with Telegram first');
-          return;
-        }
-
-        const userRef = doc(db, 'users', telegramId);
-        const userDoc = await getDoc(userRef);
-        
-        if (userDoc.exists()) {
-          setUserData(userDoc.data() as UserData);
-        } else {
-          setError('User not found. Please connect with Telegram first.');
-        }
-      } catch (err) {
-        console.error('Error loading user data:', err);
-        setError('Error loading user data');
-      }
-    };
-
-    loadUserData();
-  }, []);
   
   const transaction = {
     validUntil: Math.floor(Date.now() / 1000) + 180, // 3 minutes validity
@@ -56,13 +26,8 @@ const Page = () => {
   };
 
   const handlePurchase = async () => {
-    if (!wallet || !address) {
+    if (!wallet) {
       setError('Please connect your wallet first');
-      return;
-    }
-
-    if (!userData?.telegramId) {
-      setError('Please connect with Telegram first');
       return;
     }
 
@@ -75,18 +40,15 @@ const Page = () => {
       const result = await tonConnectUI.sendTransaction(transaction);
       console.log('Transaction sent:', result);
 
-      // Update the user document using Telegram ID as reference
-      const userRef = doc(db, 'users', userData.telegramId.toString());
+      // Update Firebase after transaction confirmation
+      const userRef = doc(db, 'users', address as string);
       await updateDoc(userRef, {
         hashrate: increment(1),
         lastPurchase: new Date().toISOString(),
-        walletAddress: address, // Optionally store the connected wallet address
-        transactions: increment(1),
-        lastTransaction: {
+        transactionHistory: {
           timestamp: new Date().toISOString(),
           amount: "10000000",
-          txHash: result.boc,
-          type: 'hashrate_purchase'
+          txHash: result.boc // Transaction hash
         }
       });
 
@@ -113,23 +75,11 @@ const Page = () => {
           </div>
         </div>
 
-        {/* User Info */}
+        {/* Wallet Info */}
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="space-y-2">
-            {userData && (
-              <>
-                <p className="text-sm text-gray-600">
-                  Username: 
-                  <span className="ml-2 font-medium">{userData.username || userData.firstName}</span>
-                </p>
-                <p className="text-sm text-gray-600">
-                  Current Hashrate: 
-                  <span className="ml-2 font-medium">{userData.hashrate}</span>
-                </p>
-              </>
-            )}
             <p className="text-sm text-gray-600">
-              Connected Wallet: 
+              Connected Address: 
               <span className="ml-2 font-mono text-blue-600">{shortAddress}</span>
             </p>
             <p className="text-sm text-gray-600">
@@ -147,10 +97,10 @@ const Page = () => {
           </p>
           <button
             onClick={handlePurchase}
-            disabled={isLoading || !wallet || !userData}
+            disabled={isLoading || !wallet}
             className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white 
               ${isLoading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'} 
-              ${(!wallet || !userData) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+              ${!wallet ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
               focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
           >
             {isLoading ? 'Processing...' : 'Buy Hashrate (0.01 TON)'}
