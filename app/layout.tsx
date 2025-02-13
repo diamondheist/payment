@@ -2,6 +2,7 @@
 import { TonConnectUIProvider } from "@tonconnect/ui-react";
 import "./globals.css";
 import Script from "next/script";
+import { UserProvider } from "@/context/UserContext";
 
 export default function RootLayout({
   children,
@@ -16,7 +17,9 @@ export default function RootLayout({
       <body
       >
         <TonConnectUIProvider manifestUrl="https://moccasin-implicit-eel-888.mypinata.cloud/ipfs/bafkreifr7ahkcwgzxsylaa6ol5sdrcfei36zquqg4zkpzhfaj6ktnaadky">
-        {children}
+        <UserProvider>
+          {children}
+        </UserProvider>
         </TonConnectUIProvider>
       </body>
     </html>

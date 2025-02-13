@@ -4,13 +4,6 @@ import React from 'react';
 import { TonConnectButton, useTonConnectUI } from '@tonconnect/ui-react';
 import { useTonAddress } from '@tonconnect/ui-react';
 import { useTonWallet } from '@tonconnect/ui-react';
-declare global {
-  interface Window {
-    Telegram: {
-      WebApp: any;
-    };
-  }
-} 
 
 function Page() {
   const address = useTonAddress(); 
