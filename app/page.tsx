@@ -83,7 +83,7 @@ const Page = () => {
               ${isLoading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'} 
               ${!wallet ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
           >
-            {isLoading ? 'Processing...' : 'Buy Hashrate (0.08 TON)'}
+            {isLoading ? 'Processing...' : 'Buy Hashrate (0.02 TON)'}
           </button>
         </div>
 
